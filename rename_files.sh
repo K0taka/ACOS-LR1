@@ -42,101 +42,79 @@ if [ ${#files[@]} -eq 0 ]; then
   exit 1
 fi
 
-#check save dir exitsting
+#Функция для группировки файлов по времени изменения
+group_files_by_mod_time() {
+  declare -A file_groups
+  for file in ${files[@]}; do
+    mod_time=$(stat -c %Y $file)
+    file_groups[$mod_time]+="$file "
+  done
+  echo "${file_groups[@]}"
+}
+
+#Функция для обработки группы файлов с одинаковым временем изменения
+process_file_group() {
+  local group=("$1")
+  local count=$2
+  local save_dir=$3
+  local action=$4 #'ln' или 'mv'
+
+  if [ ${#group[@]} -eq 1 ]; then
+    #Если только один файл, выполняем действие
+    new_name=$(printf "Война_и_мир_Часть_%03d.mp3" "$count")
+    if [ "$action" == "ln" ]; then
+      ln ${group[0]} $save_dir/$new_name
+    else
+      mv ${group[0]} $new_name
+    fi
+    ((count++))
+  else
+    #Если несколько файлов, запрашиваем выбор
+    echo "There are multiple files with the same modification time"
+    for i in ${!group[@]}; do
+      echo "$((i + 1)): ${group[i]}"
+    done
+
+    #Запрашиваем номер для каждого файла
+    for i in ${!group[@]}; do
+      read -p "Select number for the element '${group[i]}': " choice
+
+      #Проверяем корректность выбора
+      while ! [[ $choice =~ ^[1-${#group[@]}]$ ]]; do
+        read -p "Error: the number not in [1-${#group[@]}]. Select the number for '${group[i]}': " choice
+      done
+
+      new_name=$(printf "Война_и_мир_Часть_%03d.mp3" "$count")
+      if [ "$action" == "ln" ]; then
+        ln ${group[i]} $save_dir/$new_name
+      else
+        mv ${group[i]} $new_name
+      fi
+      ((count++))
+    done
+  fi
+}
+
+#Основной код
+
 if [ -n "$save_dir" ]; then
   if [ ! -d "$save_dir" ]; then
     echo "Error: dir '$save_dir' for saving hard links is not found"
     exit 1
   fi
-
-  #variable to save the number of file
-  count=1
-
-  # Создаем ассоциативный массив для хранения файлов с одинаковым временем изменения
-  declare -A file_groups
-
-  # Сортируем файлы по времени изменения и группируем их по времени
-  for file in ${files[@]}; do
-    mod_time=$(stat -c %Y $file)
-    file_groups[$mod_time]+="$file "
-  done
-
-  # Создаем хардлинки, учитывая возможные дубликаты по времени изменения
-  for mod_time in ${!file_groups[@]}; do
-    group=(${file_groups[$mod_time]})
-
-    if [ ${#group[@]} -eq 1 ]; then
-      # Если только один файл в группе, создаем хардлинк напрямую
-      new_name=$(printf "Война_и_мир_Часть_%03d.mp3" "$count")
-      ln $file $save_dir/$new_name
-      ((count++))
-    else
-      # Если несколько файлов с одинаковым временем, запрашиваем у пользователя выбор
-      echo "There is some files with the same change time"
-      for i in ${!group[@]}; do
-        echo "$((i + 1)): ${group[i]}"
-      done
-
-      # Запрашиваем номер для каждого файла в группе
-      for i in ${!group[@]}; do
-        read -p "Select number for the element '${group[i]}': " choice
-
-        # Проверяем корректность выбора (должен быть в пределах группы)
-        while ! [[ $choice =~ ^[1-${#group[@]}]$ ]]; do
-          read -p "Error: the number not in [1-${#group[@]}]. Select the number for '${group[i]}': " choice
-        done
-
-        new_name=$(printf "Война_и_мир_Часть_%03d.mp3" "$count")
-        ln ${group[i]} $save_dir/$new_name
-        ((count++))
-      done
-    fi
-  done
-
+  action="ln" #Используем hard link
 else
-  # Переименовываем файлы, если не указана директория для сохранения хардлинков
-  count=1
-
-  # Создаем ассоциативный массив для хранения файлов с одинаковым временем изменения
-  declare -A file_groups
-
-  # Сортируем файлы по времени изменения и группируем их по времени
-  for file in ${files[@]}; do
-    mod_time=$(stat -c %Y $file)
-    file_groups[$mod_time]+="$file "
-  done
-
-  # Переименовываем файлы, учитывая возможные дубликаты по времени изменения
-  for mod_time in ${!file_groups[@]}; do
-    group=(${file_groups[$mod_time]})
-
-    if [ ${#group[@]} -eq 1 ]; then
-      # Если только один файл в группе, переименовываем его напрямую
-      new_name=$(printf "Война_и_мир_Часть_%03d.mp3" $count)
-      mv ${group[0]} $new_name
-      ((count++))
-    else
-      # Если несколько файлов с одинаковым временем, запрашиваем у пользователя выбор
-      echo "There is some files with the same change time"
-      for i in ${!group[@]}; do
-        echo "$((i + 1)): ${group[i]}"
-      done
-
-      # Запрашиваем номер для каждого файла в группе
-      for i in ${!group[@]}; do
-        read -p "Выберите номер для '${group[i]}': " choice
-
-        # Проверяем корректность выбора (должен быть в пределах группы)
-        while ! [[ $choice =~ ^[1-${#group[@]}]$ ]]; do
-          read -p "Error: the number not in [1-${#group[@]}]. Select the number for '${group[i]}': " choice
-        done
-
-        new_name=$(printf "Война_и_мир_Часть_%03d.mp3" $count)
-        mv ${group[i]} $new_name
-        ((count++))
-      done
-    fi
-  done
+  action="mv" #Используем переименование
 fi
 
-echo "The skript completed its work"
+#Группируем файлы по времени изменения
+file_groups=$(group_files_by_mod_time)
+
+#Перебираем все группы файлов
+count=1
+for mod_time in ${!file_groups[@]}; do
+  group=(${file_groups[$mod_time]})
+  process_file_group "$group" $count $save_dir $action
+done
+
+echo "The script completed its work"
