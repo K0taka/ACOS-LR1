@@ -47,7 +47,8 @@ cd "$working_dir" || {
 } #if can't open working_dir show error exit
 
 #check if it is an empty dir
-if [ $(ls -l | tail -n +2 | grep -v ^d | wc -l) -eq 0 ]; then
+total_files=$(ls -l | tail -n +2 | grep -v ^d | wc -l)
+if [ $total_files -eq 0 ]; then
   echo "Error: directory $working_dir is empty"
   exit 1
 fi
@@ -59,6 +60,12 @@ mapfile -t files < <(ls | grep -E '^[A-Za-z0-9]{8}\.mp3$')
 if [ ${#files[@]} -eq 0 ]; then
   echo "Error: there are no files with 8 letters/digits in filename with .mp3 extension."
   exit 1
+fi
+
+if [ ${#files[@]} -ne $total_files ]; then
+  echo "WARNING! There are files that not math the mask of 8 letters/digits in filename with .mp3 extension:"
+  ls | grep -Ev '^[A-Za-z0-9]{8}\.mp3'
+  echo "They will be ignored"
 fi
 
 #function to process a group of files with the same modification time
