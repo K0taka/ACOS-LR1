@@ -96,20 +96,34 @@ process_file_group() {
     ((count++))
   else
     #if multiple files, ask for selection
+    declare -A selections
     echo "There are multiple files with the same modification time."
     for i in "${!group[@]}"; do
       echo "$((i + 1)): ${group[i]}"
     done
 
-    #ask for a number for each file in the group
+    #request number for each file
     for i in "${!group[@]}"; do
-      read -p "Select number for the element '${group[i]}': " choice
+      while true; do
+        read -p "Select number for the element '${group[i]}': " choice
 
-      #check validity of selection
-      while ! [[ $choice =~ ^[1-${#group[@]}]$ ]]; do
-        read -p "Error: the number not in [1-${#group[@]}]. Select the number for '${group[i]}': " choice
+        #validate number
+        if [[ $choice =~ ^[1-9][0-9]*$ ]] && [ "$choice" -le "${#group[@]}" ]; then
+          #check it wasn't chosen earlier
+          if [[ -z ${selections[$choice]} ]]; then
+            selections[$choice]=${group[i]}
+            break
+          else
+            echo "Error: The number $choice has already been assigned to '${selections[$choice]}'. Please choose a different number."
+          fi
+        else
+          echo "Error: The number is not in [1-${#group[@]}]."
+        fi
       done
+    done
 
+    positions=$(printf "%s\n" "${!selections[@]}" | sort -n)
+    for i in ${positions[@]}; do
       if [ $count -le 999 ]; then
         new_name=$(printf "Война_и_мир_Часть_%03d.mp3" "$count")
       else
@@ -117,9 +131,9 @@ process_file_group() {
       fi
 
       if [ "$action" == "ln" ]; then
-        ln "${group[i]}" "$save_dir/$new_name"
+        ln "${selections[$i]}" "$save_dir/$new_name"
       else
-        mv "${group[i]}" "$new_name"
+        mv "${selections[$i]}" "$new_name"
       fi
       ((count++))
     done
