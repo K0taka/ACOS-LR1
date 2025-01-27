@@ -2,19 +2,19 @@
 
 #help message
 help_mess() {
-  echo "Usage: $0 [-d path_to_working_directory] [-t path_to_save_directory]"
+  echo "Usage: $0 [-t path_to_save_directory] path_to_working_directory"
+  echo "  -t path_to_save_directory"
+  echo "     change the method of how the script works: it will create hard links in path_to_save_directory insted of rename files"
   exit 1
 }
 
-working_dir=$(pwd)
+#initialize path variables
 save_dir=""
+working_dir=""
 
-#args parsing
-while getopts ":d:t:" opt; do
+#argument parsing
+while getopts ":t:" opt; do #pars -t
   case $opt in
-  d)
-    working_dir="$(realpath "$OPTARG")"
-    ;;
   t)
     save_dir="$(realpath "$OPTARG")"
     ;;
@@ -24,97 +24,127 @@ while getopts ":d:t:" opt; do
   esac
 done
 
-#working directory exitsting test
+#shift positional parameters to get the working directory
+shift $((OPTIND - 1))
+
+#get the working directory from the positional argument
+if [ "$#" -ne 1 ]; then
+  help_mess #should be 1 arg or it's an error
+fi
+
+working_dir="$(realpath "$1")"
+
+#check if the working directory exists
 if [ ! -d "$working_dir" ]; then
   echo "Error! $working_dir is not found"
   exit 1
 fi
 
 #select working directory
-cd $working_dir
+cd "$working_dir" || {
+  echo "Error: can't get access to working directory. Permission denied"
+  exit 1
+} #if can't open working_dir show error exit
+
+#check if it is an empty dir
+if [ $(ls -l | tail -n +2 | grep -v ^d | wc -l) -eq 0 ]; then
+  echo "Error: directory $working_dir is empty"
+  exit 1
+fi
 
 #find files and save in array
 mapfile -t files < <(ls | grep -E '^[A-Za-z0-9]{8}\.mp3$')
 
-#check if there is any file
+#check if there are any files
 if [ ${#files[@]} -eq 0 ]; then
-  echo "Error: there is no files with 8 letters/digits in filename with .mp3 extension'"
+  echo "Error: there are no files with 8 letters/digits in filename with .mp3 extension."
   exit 1
 fi
 
-#Функция для группировки файлов по времени изменения
-group_files_by_mod_time() {
-  declare -A file_groups
-  for file in ${files[@]}; do
-    mod_time=$(stat -c %Y $file)
-    file_groups[$mod_time]+="$file "
-  done
-  echo "${file_groups[@]}"
-}
-
-#Функция для обработки группы файлов с одинаковым временем изменения
+#function to process a group of files with the same modification time
 process_file_group() {
-  local group=("$1")
-  local count=$2
-  local save_dir=$3
-  local action=$4 #'ln' или 'mv'
+  local save_dir=$1
+  local action=$2 #'ln' or 'mv'
+
+  if [ "$action" == "ln" ]; then
+    shift 2
+  else
+    shift 1
+  fi
+  local group=("$@")
 
   if [ ${#group[@]} -eq 1 ]; then
-    #Если только один файл, выполняем действие
-    new_name=$(printf "Война_и_мир_Часть_%03d.mp3" "$count")
-    if [ "$action" == "ln" ]; then
-      ln ${group[0]} $save_dir/$new_name
+    #if only one file, perform the action directly
+    if [ $count -le 999 ]; then
+      new_name=$(printf "Война_и_мир_Часть_%03d.mp3" "$count")
     else
-      mv ${group[0]} $new_name
+      new_name=$(printf "Война_и_мир_Часть_%d.mp3" "$count")
+    fi
+
+    if [ "$action" == "ln" ]; then
+      ln "${group[0]}" "$save_dir/$new_name"
+    else
+      mv "${group[0]}" "$new_name"
     fi
     ((count++))
   else
-    #Если несколько файлов, запрашиваем выбор
-    echo "There are multiple files with the same modification time"
-    for i in ${!group[@]}; do
+    #if multiple files, ask for selection
+    echo "There are multiple files with the same modification time."
+    for i in "${!group[@]}"; do
       echo "$((i + 1)): ${group[i]}"
     done
 
-    #Запрашиваем номер для каждого файла
-    for i in ${!group[@]}; do
+    #ask for a number for each file in the group
+    for i in "${!group[@]}"; do
       read -p "Select number for the element '${group[i]}': " choice
 
-      #Проверяем корректность выбора
+      #check validity of selection
       while ! [[ $choice =~ ^[1-${#group[@]}]$ ]]; do
         read -p "Error: the number not in [1-${#group[@]}]. Select the number for '${group[i]}': " choice
       done
 
-      new_name=$(printf "Война_и_мир_Часть_%03d.mp3" "$count")
-      if [ "$action" == "ln" ]; then
-        ln ${group[i]} $save_dir/$new_name
+      if [ $count -le 999 ]; then
+        new_name=$(printf "Война_и_мир_Часть_%03d.mp3" "$count")
       else
-        mv ${group[i]} $new_name
+        new_name=$(printf "Война_и_мир_Часть_%d.mp3" "$count")
+      fi
+
+      if [ "$action" == "ln" ]; then
+        ln "${group[i]}" "$save_dir/$new_name"
+      else
+        mv "${group[i]}" "$new_name"
       fi
       ((count++))
     done
   fi
 }
 
-#Основной код
+#main code
 
 if [ -n "$save_dir" ]; then
   if [ ! -d "$save_dir" ]; then
-    echo "Error: dir '$save_dir' for saving hard links is not found"
+    echo "Error: dir '$save_dir' for saving hard links is not found."
     exit 1
   fi
-  action="ln" #Используем hard link
+
+  action="ln" #use hard link
+
 else
-  action="mv" #Используем переименование
+  action="mv" #use rename
 fi
 
-#Группируем файлы по времени изменения
-file_groups=$(group_files_by_mod_time)
+#group files by modification time
+declare -A file_groups
+for file in "${files[@]}"; do
+  mod_time=$(stat -c %Y "$file")
+  file_groups[$mod_time]+="$file "
+done
 
-#Перебираем все группы файлов
+#iterate over all groups of files
 count=1
 for mod_time in ${!file_groups[@]}; do
   group=(${file_groups[$mod_time]})
-  process_file_group "$group" $count $save_dir $action
+  process_file_group $save_dir $action "${group[@]}"
 done
 
-echo "The script completed its work"
+echo "The script completed its work."
