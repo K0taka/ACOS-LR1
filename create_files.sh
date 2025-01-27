@@ -7,7 +7,7 @@ fi
 
 #creating dirs for the testing situations
 mkdir $examples_path
-mkdir $examples_path/{no_files,files_x5,files_x100,created_at_the_same_time,incorrect_names,incorrect_extension,files_x1,files_x1000, no_match}
+mkdir $examples_path/{no_files,files_x5,files_x100,created_at_the_same_time,incorrect_names,incorrect_extension,files_x1,files_x1000,no_match}
 
 #function to generate correct filenames
 #arg1 = length of name, base = 8
