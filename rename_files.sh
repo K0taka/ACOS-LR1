@@ -140,9 +140,12 @@ for file in "${files[@]}"; do
   file_groups[$mod_time]+="$file "
 done
 
+#array to save a sorted modification
+sorted_mod_times=($(printf "%s\n" "${!file_groups[@]}" | sort -n))
+
 #iterate over all groups of files
 count=1
-for mod_time in ${!file_groups[@]}; do
+for mod_time in ${sorted_mod_times[@]}; do
   group=(${file_groups[$mod_time]})
   process_file_group $save_dir $action "${group[@]}"
 done
