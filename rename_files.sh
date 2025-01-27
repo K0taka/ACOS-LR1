@@ -147,7 +147,10 @@ if [ -n "$save_dir" ]; then
     echo "Error: dir '$save_dir' for saving hard links is not found."
     exit 1
   fi
-
+  if [ $(ls -l $save_dir | tail -n +2 | grep -v ^d | wc -l) -ne 0 ]; then
+    echo "Error: dir '$save_dir' is not empty!"
+    exit 1
+  fi
   action="ln" #use hard link
 
 else
