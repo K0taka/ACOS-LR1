@@ -52,7 +52,7 @@ generate_files() {
         ;;
       esac
     )
-    sleep 1
+    sleep 1.3
   done
 }
 

@@ -19,6 +19,7 @@ while getopts ":t:" opt; do #pars -t
     save_dir="$(realpath "$OPTARG")"
     ;;
   *)
+    echo "Error! Non existed key argument"
     help_mess
     ;;
   esac
@@ -29,6 +30,7 @@ shift $((OPTIND - 1))
 
 #get the working directory from the positional argument
 if [ "$#" -ne 1 ]; then
+  echo "Error! should be only 1 path_to_working_directory"
   help_mess #should be 1 arg or it's an error
 fi
 
