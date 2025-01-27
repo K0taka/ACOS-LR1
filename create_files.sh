@@ -7,7 +7,7 @@ fi
 
 #creating dirs for the testing situations
 mkdir $examples_path
-mkdir $examples_path/{no_files,files_x5,files_x100,created_at_the_same_time,incorrect_names,incorrect_extension,files_x1}
+mkdir $examples_path/{no_files,files_x5,files_x100,created_at_the_same_time,incorrect_names,incorrect_extension,files_x1,files_x1000, no_match}
 
 #function to generate correct filenames
 #arg1 = length of name, base = 8
@@ -58,6 +58,9 @@ generate_files() {
 
 #for no_files there is no need to generate any files
 
+#for no_match generate files with errors
+generate_files 5 no_match 7 wav
+
 #for files_x1 generate 1 file with correct name
 touch $examples_path/files_x1/$(generate_name)
 
@@ -66,6 +69,9 @@ generate_files 5 files_x5
 
 #for files_x100 generate 100 files with correct name
 generate_files 100 files_x100
+
+#for files_x1000 generate 1000 files with correct name
+generate_files 1000 files_x1000
 
 #creating some files with diff timestamps
 generate_files 3 created_at_the_same_time
