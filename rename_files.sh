@@ -28,6 +28,12 @@ done
 #shift positional parameters to get the working directory
 shift $((OPTIND - 1))
 
+#check if less then 1 arg
+if [ "$#" -lt 1 ]; then
+  echo "Error! 1 argument: path_to_working_directory required"
+  help_mess
+fi
+
 #get the working directory from the positional argument
 if [ "$#" -ne 1 ]; then
   echo "Error! should be only 1 path_to_working_directory"
